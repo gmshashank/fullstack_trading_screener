@@ -1,70 +1,85 @@
 import config
-
-# from alpaca.data.historical import StockHistoricalDataClient
-# from alpaca.data.requests import StockLatestQuoteRequest
-# from alpaca.data.timeframe import TimeFrame
-
-# # keys required for stock historical data client
-# client = StockHistoricalDataClient(config.API_KEY, config.SECRET_KEY)
-
-# # multi symbol request - single symbol is similar
-# multisymbol_request_params = StockLatestQuoteRequest(symbol_or_symbols=["SPY", "GLD", "TLT"])
-
-# latest_multisymbol_quotes = client.get_stock_latest_quote(multisymbol_request_params)
-# client.get_stock_bars()
-
-# gld_latest_ask_price = latest_multisymbol_quotes["GLD"].ask_price
-# print(gld_latest_ask_price)
-
+import sqlite3
 
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.requests import StockBarsRequest
-from alpaca.data.historical import StockHistoricalDataClient# Create stock historical data client
-# keys required for stock historical data client
-client = StockHistoricalDataClient(config.API_KEY, config.SECRET_KEY)
-request_params = StockBarsRequest(
-                        symbol_or_symbols=["TSLA"],
-                        timeframe=TimeFrame.Day,
-                        start="2022-01-01 00:00:00"
-                 )
-bars = client.get_stock_bars(request_params)
-bars_df = bars.df
-print(bars_df)
+from alpaca.data.historical import StockHistoricalDataClient    # Create stock historical data client
 
-
-# import datetime as dt
-# import pytz
-# def get_last2Days_bars(_ticker):
-#     _timeNow = dt.datetime.now(pytz.timezone('US/Eastern'))
-#     _2DaysAgo = _timeNow - dt.timedelta(days=2) 
-
-#     _bars = api.get_bars(_ticker, TimeFrame.Day,
-#                          start=_2DaysAgo.isoformat(),
-#                          end=None,
-#                          limit=2
-#                          )
-#     print(_bars)
-
-
-# # Crypto
-# from alpaca.data.historical import CryptoHistoricalDataClient
-# from alpaca.data.requests import CryptoBarsRequest
-# from alpaca.data.timeframe import TimeFrame
-
-# # no keys required for crypto data
-# client = CryptoHistoricalDataClient()
-
-# request_params = CryptoBarsRequest(
-#                         symbol_or_symbols=["BTC/USD", "ETH/USD"],
+# # Data by minute
+# # client = StockHistoricalDataClient(api_key, api_secret)
+# client=StockHistoricalDataClient(config.API_KEY,config.SECRET_KEY)    
+# request_params = StockBarsRequest(
+#                         symbol_or_symbols=["AAPL", "TSLA"],
 #                         timeframe=TimeFrame.Day,
-#                         start="2022-09-01T07:20:50.52Z"
+#                         start="2022-10-04 00:00:00",
+#                         # end="2022-10-06 00:00:00"
 #                  )
+# bars = client.get_stock_bars(request_params)
+# bars_df = bars.df
+# print(bars_df)
 
-# bars = client.get_crypto_bars(request_params)
+def populate_price():
+    connection=sqlite3.connect(config.DB_FILE)
+    connection.row_factory=sqlite3.Row
+    cursor=connection.cursor()
+    cursor.execute("SELECT id,symbol,name FROM stock")
+    rows = cursor.fetchall()
+    symbols = [row['symbol'] for row in rows]
+    # print(symbols)
+    stock_dict={}
+    for row in rows:
+        symbol=row["symbol"]
+        symbols.append(symbol)
+        stock_dict[symbol]=row["id"]
 
-# # convert to dataframe
-# bars=bars.df
+    client=StockHistoricalDataClient(config.API_KEY,config.SECRET_KEY)    
+    chunk_size=200
+    # for i in range(0,len(symbols),chunk_size):
+    for i in range(0,1,chunk_size):
+        symbol_chunk=symbols[i:i+chunk_size]
+        print(symbol_chunk)
+        # print(type(symbol_chunk))
+        request_params=StockBarsRequest(
+            symbol_or_symbols=symbol_chunk,
+            timeframe=TimeFrame.Day
+            # ,start="2010-10-04 00:00:00",
+            )
+        # barsets=client.get_stock_bars()
+        barsets=client.get_stock_bars(request_params)
+        # print(barsets)
+        # # print(type(barsets))
+        # barsets_df=barsets.df
+        # # print(barsets_df.head())
+        # print(barsets_df)
+        # print(barsets_df.columns)
 
-# # access bars as list - important to note that you must access by symbol key
-# # even for a single symbol request - models are agnostic to number of symbols
-# print(bars["BTC/USD"])
+
+        for key,val in barsets:
+            print(key)
+            print(val)
+            print(type(val))
+            print(val.keys())
+            print(val.values())
+            for dict_key in val.values():
+                print(f"dict_key: {dict_key}")
+                print(type(dict_key))
+                print(type(dict_key[0]))
+            # print(type(val.values()))
+            # print((val.values())["open"])
+
+    #     for symbol in barsets:
+    #         print(f"Processing symbol:- {symbol}")
+    #         # print(type(symbol))
+    #         print(f" barsets[symbol]: {barsets[symbol]}")
+    #         # print(f" barsets[symbol]: {(symbol[1].values())}")
+    #         for bar in barsets[symbol]:
+    #             print(bar)
+    #         #     stock_id=stock_dict[symbol]
+    #         #     cursor.execute("INSERT INTO stock_price (stock_id,date,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",(stock_id,bar.t.date(),bar.o,bar.h,bar.l,bar.c,bar.v))
+    
+    # connection.commit()
+    # pass
+
+if __name__ == "__main__":
+    populate_price()
+    pass
